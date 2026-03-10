@@ -51,7 +51,7 @@ if st.session_state.api_key:
 
         uploaded_files = st.file_uploader("이미지를 업로드해 주세요 (다중 선택 가능)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
-        if uploaded_files and st.button("🚀 분석 및 세로형 결과 생성"):
+        if uploaded_files and st.button("🚀 분석 및 결과 생성"):
             all_results = []
             for uploaded_file in uploaded_files:
                 image = Image.open(uploaded_file)
@@ -69,13 +69,13 @@ if st.session_state.api_key:
             df_vert = df.set_index('파일명').T # 행과 열을 바꿈 (Transpose)
 
             st.success("✨ 분석 완료!")
-            st.write("### 📊 키워드 확인 (세로형)")
+            st.write("### 📊 키워드 확인")
             st.dataframe(df_vert, use_container_width=True)
 
             # 세로형 CSV 다운로드 전용
             csv_vert = df_vert.to_csv(encoding='utf-8-sig').encode('utf-8-sig')
             st.download_button(
-                label="📥 세로형 결과(CSV) 다운로드",
+                label="📥 결과(CSV) 다운로드",
                 data=csv_vert,
                 file_name="stock_keywords_vertical.csv",
                 mime="text/csv"
