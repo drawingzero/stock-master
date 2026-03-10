@@ -38,7 +38,7 @@ with st.sidebar:
     st.info("API 키를 바꾸려면 '로그아웃' 후 다시 입력하세요.")
 
 # 3. 메인 화면
-st.title("🎨 스톡 마스터 AI 비서 (Vertical)")
+st.title("🎨 스톡 마스터")
 
 if st.session_state.api_key:
     genai.configure(api_key=st.session_state.api_key)
