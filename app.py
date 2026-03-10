@@ -5,13 +5,14 @@ import pandas as pd
 import json
 import datetime
 
-# 1. 사이트 설정 및 디자인
-st.set_page_config(page_title="Stock Master AI v3.1", page_icon="💰", layout="wide")
+# 1. 사이트 설정 및 디자인 (심플 & 클린)
+st.set_page_config(page_title="Stock Master AI", page_icon="🎨", layout="wide")
 
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { background-color: #ff4bb4; color: white; border-radius: 8px; font-weight: bold; }
+    .main { background-color: #ffffff; }
+    .stButton>button { background-color: #ff4bb4; color: white; border-radius: 8px; width: 100%; font-weight: bold; }
+    .stTab { font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -20,43 +21,42 @@ if 'api_key' not in st.session_state:
     st.session_state.api_key = st.secrets.get("GEMINI_API_KEY", "")
 
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.header("⚙️ Account")
     if not st.session_state.api_key:
-        new_key = st.text_input("Gemini API Key를 입력해 주세요", type="password")
-        if st.button("로그인 (키 저장)"):
+        new_key = st.text_input("Gemini API Key를 입력하세요", type="password")
+        if st.button("로그인"):
             st.session_state.api_key = new_key
             st.rerun()
     else:
-        st.success("✅ 로그인 완료")
+        st.success("✅ 연결됨")
         if st.button("로그아웃"):
             st.session_state.api_key = ""
             st.rerun()
+    st.divider()
+    st.caption("비밀 금고(Secrets) 설정 시 자동 로그인됩니다.")
 
-# 3. 메인 화면 구성
-st.title("🚀 Stock Master AI: Market Analyzer")
+# 3. 메인 콘텐츠
+st.title("🎨 Stock Master AI")
 
 if st.session_state.api_key:
     genai.configure(api_key=st.session_state.api_key)
     
     try:
-        # [핵심 수정] 사용 가능한 모델 목록을 실시간으로 가져와서 설정합니다.
+        # 모델 자동 탐색 (NotFound 에러 방지)
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        # 'flash' 모델이 있으면 우선 선택, 없으면 첫 번째 모델 선택
         flash_models = [m for m in models if 'flash' in m.lower()]
         selected_model_name = flash_models[0] if flash_models else models[0]
         model = genai.GenerativeModel(selected_model_name)
-        
-        with st.sidebar:
-            st.caption(f"현재 연결된 모델: {selected_model_name}")
 
-        tab1, tab2, tab3 = st.tabs(["🔍 키워드 생성", "💡 시장 분석 & 테마 기획", "📊 수익 통합 대시보드"])
+        # 탭 구성 (수익 탭 삭제)
+        tab1, tab2 = st.tabs(["🔍 키워드 생성", "💡 시장 분석 & 테마 기획"])
 
         # --- TAB 1: 키워드 생성기 ---
         with tab1:
-            st.subheader("이미지 분석 및 키워드 추출")
+            st.subheader("이미지 분석 및 사이트별 키워드 추출")
             uploaded_files = st.file_uploader("이미지를 업로드하세요", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
             
-            if uploaded_files and st.button("🚀 키워드 추출 시작"):
+            if uploaded_files and st.button("🚀 분석 시작"):
                 all_rows = []
                 for uploaded_file in uploaded_files:
                     image = Image.open(uploaded_file)
@@ -64,35 +64,42 @@ if st.session_state.api_key:
                     통로/유토(한글25개), 게티(한글20개), 미리캔버스(한글10개) 키워드와 제목을 JSON으로 추출하세요. 
                     형식: {"shutterstock": {"title": "..", "keywords": ".."}, ...}"""
                     
-                    with st.spinner(f"'{uploaded_file.name}' 분석 중..."):
+                    with st.spinner(f"'{uploaded_file.name}' 처리 중..."):
                         response = model.generate_content([prompt, image])
-                        # JSON 응답 정제 로직 강화
                         content_text = response.text.replace('```json', '').replace('```', '').strip()
                         raw_data = json.loads(content_text)
                         for site, content in raw_data.items():
                             all_rows.append({"파일명": uploaded_file.name, "사이트": site, "타이틀": content['title'], "키워드": content['keywords']})
                 
                 df = pd.DataFrame(all_rows)
+                st.success("완료!")
                 st.dataframe(df, use_container_width=True)
-                st.download_button("📥 세로형 CSV 다운로드", df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), "stock_vertical.csv", "text/csv")
+                st.download_button("📥 수직형 CSV 다운로드", df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), "stock_vertical.csv", "text/csv")
 
         # --- TAB 2: 시장 분석 & 테마 기획 ---
         with tab2:
-            st.subheader("📅 2개월 뒤 블루오션 테마 찾기")
-            target_date = datetime.date.today() + datetime.timedelta(days=60)
-            if st.button("🌟 고수요/저공급 테마 10개 추천받기"):
-                plan_prompt = f"{target_date.month}월 스톡 시장을 분석하여 수요가 높은 블루오션 테마 10개를 상세히 추천해 주세요."
-                with st.spinner("시장 데이터를 분석 중입니다..."):
-                    response = model.generate_content(plan_prompt)
-                    st.markdown(response.text)
-
-        # --- TAB 3: 수익 통합 대시보드 ---
-        with tab3:
-            st.subheader("💰 통합 수익 관리")
-            st.info("현재 노션에서 관리 중인 정산 파일(CSV)의 컬럼명(제목들)을 알려주시면 합산 기능을 만들어 드릴게요!")
+            st.subheader("📅 데이터 기반 전략 기획")
+            curr_date = datetime.date.today()
+            target_date = curr_date + datetime.timedelta(days=60)
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.write("### 💎 현시점 블루오션")
+                st.caption(f"{curr_date.month}월 기준: 지금 당장 필요한 틈새 테마")
+                if st.button("🔍 현재 니치 마켓 찾기"):
+                    with st.spinner("현재 시장 분석 중..."):
+                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 스톡 시장에서 공급이 부족한 고수요 블루오션 일러스트 테마 10개를 상세히 추천해줘.")
+                        st.markdown(res.text)
+            
+            with c2:
+                st.write("### 🔥 2개월 뒤 스테디")
+                st.caption(f"{target_date.month}월 기준: 대형 시즌 수요 미리 준비")
+                if st.button(f"📈 {target_date.month}월 스테디 테마 찾기"):
+                    with st.spinner(f"{target_date.month}월 대목 분석 중..."):
+                        res = model.generate_content(f"2026년 {target_date.month}월 스톡 시장에서 가장 많이 팔릴 일러스트 스테디셀러 테마 10개를 추천하고 상업적 구도를 제안해줘.")
+                        st.markdown(res.text)
 
     except Exception as e:
-        st.error(f"설정 중 오류가 발생했습니다: {e}")
-        st.info("사이드바에서 API 키를 다시 확인하거나 잠시 후 시도해 보세요.")
+        st.error(f"오류가 발생했습니다: {e}")
 else:
-    st.warning("왼쪽 사이드바에서 로그인해 주세요.")
+    st.warning("사이드바에서 로그인해 주세요.")
