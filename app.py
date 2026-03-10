@@ -3,82 +3,46 @@ import google.generativeai as genai
 from PIL import Image
 import pandas as pd
 import json
-import io
 
-# 1. 웹사이트 기본 설정
 st.set_page_config(page_title="Stock Master AI", page_icon="🎨")
+st.title("🎨 스톡 마스터 AI (에러 해결 버전)")
 
-# 디자인 테마 (핑크색 포인트)
-st.markdown("""
-    <style>
-    .main { background-color: #fff5f7; }
-    .stButton>button { background-color: #ff4bb4; color: white; border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
+# 1. API 키 설정 (Secrets 또는 사이드바)
+api_key = st.secrets.get("GEMINI_API_KEY", "")
+if not api_key:
+    api_key = st.sidebar.text_input("Gemini API Key를 입력해 주세요", type="password")
 
-st.title("🎨 스톡 마스터 AI 비서")
-st.write("이미지를 업로드하시면 사이트별 최적화된 키워드를 자동으로 생성해 드립니다.")
-
-# 2. 사이드바 설정 (API 키 입력)
-with st.sidebar:
-    st.header("⚙️ 설정")
-    api_key = st.text_input("Gemini API Key를 입력해 주세요", type="password")
-    st.info("API 키는 Google AI Studio에서 무료로 발급받으실 수 있습니다.")
-
-# 3. 메인 로직
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    
+    try:
+        # 2. 내 키로 사용 가능한 모델 목록 가져오기
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        st.sidebar.success("✅ API 연결 성공!")
+        selected_model = st.sidebar.selectbox("사용할 모델을 선택해 주세요", models)
+        st.sidebar.write(f"현재 선택된 모델: `{selected_model}`")
+        
+        # 3. 모델 설정
+        model = genai.GenerativeModel(selected_model)
 
-    uploaded_files = st.file_uploader("이미지 파일들을 선택해 주세요 (PNG, JPG, JPEG)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+        uploaded_files = st.file_uploader("이미지를 올려주세요", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
-    if uploaded_files:
-        if st.button("🚀 분석 시작하기"):
+        if uploaded_files and st.button("🚀 분석 시작"):
             all_results = []
-            progress_bar = st.progress(0)
-            
-            for i, uploaded_file in enumerate(uploaded_files):
-                # 이미지 읽기
+            for uploaded_file in uploaded_files:
                 image = Image.open(uploaded_file)
+                prompt = "이 이미지를 분석해서 짧은 한글 제목 1개만 지어줘. 결과는 반드시 JSON 형식으로: {'title': '제목'}"
                 
-                # AI 지침서 (Prompt)
-                prompt = """
-                당신은 스톡 이미지 키워드 전문가입니다. 이미지를 분석하여 규칙을 지켜 작성하세요.
-                결과는 반드시 JSON 형식으로만 응답하세요:
-                {
-                  "title_en": "영어 제목",
-                  "title_ko": "한글 제목",
-                  "shutterstock": "영문 키워드 35개 (쉼표 구분)",
-                  "adobe": "영문 키워드 30개 (중요 단어 10개를 앞배치, 쉼표 구분)",
-                  "tongro_uto_getty": "한글 키워드 25개 (쉼표 구분)",
-                  "miricanvas": "한글 핵심 키워드 딱 10개 (쉼표 구분)"
-                }
-                """
-                
-                with st.spinner(f"'{uploaded_file.name}' 분석 중..."):
+                with st.spinner(f"'{uploaded_file.name}' 테스트 중..."):
+                    # 여기서 에러가 나면 모델 이름 문제일 확률 99%
                     response = model.generate_content([prompt, image])
-                    try:
-                        clean_text = response.text.replace('```json', '').replace('```', '').strip()
-                        data = json.loads(clean_text)
-                        data['파일명'] = uploaded_file.name
-                        all_results.append(data)
-                    except:
-                        st.error(f"{uploaded_file.name} 분석 중 오류가 발생했습니다.")
-                
-                progress_bar.progress((i + 1) / len(uploaded_files))
+                    st.write(response.text) # 결과 확인용
+                    
+            st.success("테스트 완료! 잘 작동한다면 전체 지침(Prompt)을 다시 넣어줄게.")
 
-            # 결과 리포트
-            st.success("모든 분석이 완료되었습니다!")
-            df = pd.DataFrame(all_results)
-            st.dataframe(df)
-
-            # 엑셀(CSV) 다운로드 버튼
-            csv = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-            st.download_button(
-                label="📥 분석 결과(CSV) 다운로드",
-                data=csv,
-                file_name="stock_keywords.csv",
-                mime="text/csv"
-            )
+    except Exception as e:
+        st.error(f"모델 목록을 가져오는 중 에러 발생: {e}")
+        st.info("API 키가 올바른지, 혹은 구글 AI 스튜디오에서 서비스 중인 지역인지 확인이 필요해요.")
 else:
-    st.warning("먼저 왼쪽 사이드바에서 API 키를 입력해 주세요!")
+    st.warning("사이드바에 API 키를 넣어주세요!")
