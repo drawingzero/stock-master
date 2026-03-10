@@ -28,7 +28,7 @@ with st.sidebar:
 # 3. 메인 로직
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('models/gemini-3-flash')
 
     uploaded_files = st.file_uploader("이미지 파일들을 선택해 주세요 (PNG, JPG, JPEG)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
