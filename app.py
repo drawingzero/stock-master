@@ -60,7 +60,7 @@ if st.session_state.api_key:
                 all_rows = []
                 for uploaded_file in uploaded_files:
                     image = Image.open(uploaded_file)
-                    prompt = """스톡 전문가로서 이미지를 분석해 셔터스톡(영문35개), 어도비(영문30개, 앞10개중요), 
+                    prompt = """스톡 전문가로서 이미지를 분석해 검색량이 높은 단어로 셔터스톡(영문35개), 어도비(영문30개, 앞10개중요), 
                     통로/유토(한글25개), 게티(한글20개), 미리캔버스(한글10개) 키워드와 제목을 JSON으로 추출하세요. 
                     형식: {"shutterstock": {"title": "..", "keywords": ".."}, ...}"""
                     
@@ -74,7 +74,7 @@ if st.session_state.api_key:
                 df = pd.DataFrame(all_rows)
                 st.success("완료!")
                 st.dataframe(df, use_container_width=True)
-                st.download_button("📥 수직형 CSV 다운로드", df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), "stock_vertical.csv", "text/csv")
+                st.download_button("📥 CSV 다운로드", df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), "stock_vertical.csv", "text/csv")
 
         # --- TAB 2: 시장 분석 & 테마 기획 ---
         with tab2:
@@ -88,7 +88,7 @@ if st.session_state.api_key:
                 st.caption(f"{curr_date.month}월 기준: 지금 당장 필요한 틈새 테마")
                 if st.button("🔍 현재 니치 마켓 찾기"):
                     with st.spinner("현재 시장 분석 중..."):
-                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 스톡 시장에서 공급이 부족한 고수요 블루오션 일러스트 테마 10개를 상세히 추천해줘.")
+                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 스톡 시장에서 공급이 부족한 고수요 블루오션 일러스트 테마 3개를 상세히 추천해줘.")
                         st.markdown(res.text)
             
             with c2:
@@ -96,7 +96,7 @@ if st.session_state.api_key:
                 st.caption(f"{target_date.month}월 기준: 대형 시즌 수요 미리 준비")
                 if st.button(f"📈 {target_date.month}월 스테디 테마 찾기"):
                     with st.spinner(f"{target_date.month}월 대목 분석 중..."):
-                        res = model.generate_content(f"2026년 {target_date.month}월 스톡 시장에서 가장 많이 팔릴 일러스트 스테디셀러 테마 10개를 추천하고 상업적 구도를 제안해줘.")
+                        res = model.generate_content(f"2026년 {target_date.month}월 스톡 시장에서 가장 많이 팔릴 일러스트 스테디셀러 테마 3개를 추천하고 상업적 구도를 제안해줘.")
                         st.markdown(res.text)
 
     except Exception as e:
