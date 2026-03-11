@@ -96,7 +96,7 @@ if st.session_state.api_key:
                 st.caption(f"{target_date.month}월 기준: 2개월 뒤 수요 미리 준비")
                 if st.button(f"📈 {target_date.month}월 분석하기"):
                     with st.spinner(f"{target_date.month}월 대목 분석 중..."):
-                        res = model.generate_content(f"2026년 {target_date.month}월 스톡 시장에서 가장 많이 팔릴 일러스트 스테디셀러 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
+                        res = model.generate_content(f"2026년 {target_date.month}월 스톡 시장에서 매해 검색량이 증가하는 일러스트 스테디셀러 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
                         st.markdown(res.text)
 
     except Exception as e:
