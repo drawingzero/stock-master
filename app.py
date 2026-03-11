@@ -60,8 +60,8 @@ if st.session_state.api_key:
                 all_rows = []
                 for uploaded_file in uploaded_files:
                     image = Image.open(uploaded_file)
-                    prompt = """스톡 전문가로서 이미지를 분석해 검색량이 높은 단어로 셔터스톡(영문35개), 어도비(영문30개, 앞10개중요), 
-                    통로/유토(한글25개), 게티(한글20개), 미리캔버스(한글10개) 키워드와 제목을 JSON으로 추출하세요. 
+                    prompt = """스톡 전문가로서 이미지를 분석해 셔터스톡(영문35개), 어도비(영문30개, 앞10개중요), 
+                    통로/유토(한글25개), 게티(한글20개), 미리캔버스(한글10개) 검색량이 높은 단어로 구성된 키워드와 제목을 JSON으로 추출하세요. 
                     형식: {"shutterstock": {"title": "..", "keywords": ".."}, ...}"""
                     
                     with st.spinner(f"'{uploaded_file.name}' 처리 중..."):
@@ -84,19 +84,19 @@ if st.session_state.api_key:
             
             c1, c2 = st.columns(2)
             with c1:
-                st.write("### 💎 현시점 블루오션")
+                st.write("### 💎 Blue Ocean")
                 st.caption(f"{curr_date.month}월 기준: 지금 당장 필요한 틈새 테마")
-                if st.button("🔍 현재 니치 마켓 찾기"):
+                if st.button("🔍 분석하기"):
                     with st.spinner("현재 시장 분석 중..."):
-                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 스톡 시장에서 공급이 부족한 고수요 블루오션 일러스트 테마 3개를 상세히 추천해줘.")
+                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 스톡 시장에서 공급이 부족한 고수요 블루오션 일러스트 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
                         st.markdown(res.text)
             
             with c2:
-                st.write("### 🔥 2개월 뒤 스테디")
-                st.caption(f"{target_date.month}월 기준: 대형 시즌 수요 미리 준비")
-                if st.button(f"📈 {target_date.month}월 스테디 테마 찾기"):
+                st.write("### 🔥 Steady")
+                st.caption(f"{target_date.month}월 기준: 2개월 뒤 수요 미리 준비")
+                if st.button(f"📈 {target_date.month}월 분석하기"):
                     with st.spinner(f"{target_date.month}월 대목 분석 중..."):
-                        res = model.generate_content(f"2026년 {target_date.month}월 스톡 시장에서 가장 많이 팔릴 일러스트 스테디셀러 테마 3개를 추천하고 상업적 구도를 제안해줘.")
+                        res = model.generate_content(f"2026년 {target_date.month}월 스톡 시장에서 가장 많이 팔릴 일러스트 스테디셀러 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
                         st.markdown(res.text)
 
     except Exception as e:
