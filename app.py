@@ -89,7 +89,7 @@ if st.session_state.api_key:
                 st.caption(f"{curr_date.month}월 기준 틈새 테마")
                 if st.button("🔍 블루오션 분석"):
                     with st.spinner("분석 중..."):
-                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 이미지스톡 시장에서 공급이 부족한 고수요 블루오션 일러스트 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
+                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 이미지스톡 시장에서 검색량에 비해 데이터가 부족한 고수요 저공급 블루오션 일러스트 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
                         st.session_state.theme_result = res.text # 결과를 세션에 저장
             
             with c2:
