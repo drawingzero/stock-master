@@ -35,7 +35,7 @@ with st.sidebar:
         st.success("✅ 연결됨")
         if st.button("로그아웃"):
             st.session_state.api_key = ""
-            st.session_state.theme_result = "" # 로그아웃 시 결과도 삭제
+            st.session_state.theme_result = "" 
             st.rerun()
     st.divider()
     st.caption("비밀 금고(Secrets) 설정 시 자동 로그인됩니다.")
@@ -47,6 +47,7 @@ if st.session_state.api_key:
     genai.configure(api_key=st.session_state.api_key)
     
     try:
+        # 모델 자동 탐색
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         flash_models = [m for m in models if 'flash' in m.lower()]
         selected_model_name = flash_models[0] if flash_models else models[0]
@@ -54,6 +55,7 @@ if st.session_state.api_key:
 
         tab1, tab2 = st.tabs(["🔍 키워드 생성", "💡 시장 분석 & 테마 기획"])
 
+        # --- TAB 1: 키워드 생성기 ---
         with tab1:
             st.subheader("이미지 분석 및 사이트별 키워드 추출")
             uploaded_files = st.file_uploader("이미지를 업로드하세요", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
@@ -78,6 +80,7 @@ if st.session_state.api_key:
                 st.dataframe(df, use_container_width=True)
                 st.download_button("📥 CSV 다운로드", df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), "stock_vertical.csv", "text/csv")
 
+        # --- TAB 2: 시장 분석 & 테마 기획 ---
         with tab2:
             st.subheader("📅 데이터 기반 전략 기획")
             curr_date = datetime.date.today()
@@ -89,8 +92,9 @@ if st.session_state.api_key:
                 st.caption(f"{curr_date.month}월 기준 틈새 테마")
                 if st.button("🔍 블루오션 분석"):
                     with st.spinner("분석 중..."):
-                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 이미지스톡 시장에서 검색량에 비해 데이터가 부족한 고수요 저공급 블루오션 일러스트 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
-                        st.session_state.theme_result = res.text # 결과를 세션에 저장
+                        res = model.generate_content(f"2026년 {curr_date.month}월 현재 이미지스톡 시장에서 검색량 대비 결과값이 부족한 고수요 저공급 블루오션 일러스트 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
+                        st.session_state.theme_result = res.text 
+                        st.rerun() # 결과 반영을 위해 새로고침
             
             with c2:
                 st.write("### 🔥 Steady")
@@ -98,17 +102,15 @@ if st.session_state.api_key:
                 if st.button(f"📈 {target_date.month}월 분석"):
                     with st.spinner(f"{target_date.month}월 분석 중..."):
                         res = model.generate_content(f"2026년 {target_date.month}월의 한국과 전세계 공통 기념일/행사를 알려주고, 이를 기반으로 해당 달에 검색량이 많을 일러스트 스테디셀러 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
-                        st.session_state.theme_result = res.text # 결과를 세션에 저장
+                        st.session_state.theme_result = res.text
+                        st.rerun()
 
-            # --- 추천 결과 출력 및 복사 기능 ---
-if st.session_state.theme_result:
-    st.divider()
-    st.markdown("### ✨ 분석 결과")
-    
-    # 결과 내용을 코드 박스에 넣으면 자동으로 복사 버튼이 생겨!
-    st.code(st.session_state.theme_result, language="markdown")
-    
-    st.info("💡 코드 박스 오른쪽 위의 복사 아이콘을 누르면 전체 복사돼!")
+            # --- 추천 결과 출력 및 복사 기능 (Tab 2 내부에 배치) ---
+            if st.session_state.theme_result:
+                st.divider()
+                st.markdown("### ✨ 분석 결과")
+                st.code(st.session_state.theme_result, language="markdown")
+                st.info("💡 코드 박스 오른쪽 위의 복사 아이콘을 누르면 전체 복사돼!")
 
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
