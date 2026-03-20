@@ -5,7 +5,7 @@ import pandas as pd
 import json
 import datetime
 
-# 1. 사이트 설정 및 디자인 (심플 & 클린)
+# 1. 사이트 설정 및 디자인
 st.set_page_config(page_title="Stock Master AI", page_icon="🎨", layout="wide")
 
 st.markdown("""
@@ -20,6 +20,10 @@ st.markdown("""
 if 'api_key' not in st.session_state:
     st.session_state.api_key = st.secrets.get("GEMINI_API_KEY", "")
 
+# 결과 저장을 위한 세션 상태 초기화
+if 'theme_result' not in st.session_state:
+    st.session_state.theme_result = ""
+
 with st.sidebar:
     st.header("⚙️ Account")
     if not st.session_state.api_key:
@@ -31,6 +35,7 @@ with st.sidebar:
         st.success("✅ 연결됨")
         if st.button("로그아웃"):
             st.session_state.api_key = ""
+            st.session_state.theme_result = "" # 로그아웃 시 결과도 삭제
             st.rerun()
     st.divider()
     st.caption("비밀 금고(Secrets) 설정 시 자동 로그인됩니다.")
@@ -42,16 +47,13 @@ if st.session_state.api_key:
     genai.configure(api_key=st.session_state.api_key)
     
     try:
-        # 모델 자동 탐색 (NotFound 에러 방지)
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         flash_models = [m for m in models if 'flash' in m.lower()]
         selected_model_name = flash_models[0] if flash_models else models[0]
         model = genai.GenerativeModel(selected_model_name)
 
-        # 탭 구성 (수익 탭 삭제)
         tab1, tab2 = st.tabs(["🔍 키워드 생성", "💡 시장 분석 & 테마 기획"])
 
-        # --- TAB 1: 키워드 생성기 ---
         with tab1:
             st.subheader("이미지 분석 및 사이트별 키워드 추출")
             uploaded_files = st.file_uploader("이미지를 업로드하세요", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
@@ -76,7 +78,6 @@ if st.session_state.api_key:
                 st.dataframe(df, use_container_width=True)
                 st.download_button("📥 CSV 다운로드", df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), "stock_vertical.csv", "text/csv")
 
-        # --- TAB 2: 시장 분석 & 테마 기획 ---
         with tab2:
             st.subheader("📅 데이터 기반 전략 기획")
             curr_date = datetime.date.today()
@@ -85,19 +86,29 @@ if st.session_state.api_key:
             c1, c2 = st.columns(2)
             with c1:
                 st.write("### 💎 Blue Ocean")
-                st.caption(f"{curr_date.month}월 기준: 지금 당장 필요한 틈새 테마")
-                if st.button("🔍 분석하기"):
-                    with st.spinner("현재 시장 분석 중..."):
+                st.caption(f"{curr_date.month}월 기준 틈새 테마")
+                if st.button("🔍 블루오션 분석"):
+                    with st.spinner("분석 중..."):
                         res = model.generate_content(f"2026년 {curr_date.month}월 현재 이미지스톡 시장에서 공급이 부족한 고수요 블루오션 일러스트 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
-                        st.markdown(res.text)
+                        st.session_state.theme_result = res.text # 결과를 세션에 저장
             
             with c2:
                 st.write("### 🔥 Steady")
-                st.caption(f"{target_date.month}월 기준: 2개월 뒤 수요 미리 준비")
-                if st.button(f"📈 {target_date.month}월 분석하기"):
+                st.caption(f"{target_date.month}월 기준 스테디 테마")
+                if st.button(f"📈 {target_date.month}월 분석"):
                     with st.spinner(f"{target_date.month}월 분석 중..."):
-                        res = model.generate_content(f"2026년 {target_date.month}월의 한국과 전세계 공통 기념일이나 행사에 대해 알려주고, 이를 기반으로 이미지스톡 시장에서 해당 달에 검색량이 많고 수요가 있는 일러스트 스테디셀러 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
-                        st.markdown(res.text)
+                        res = model.generate_content(f"2026년 {target_date.month}월의 한국과 전세계 공통 기념일/행사를 알려주고, 이를 기반으로 해당 달에 검색량이 많을 일러스트 스테디셀러 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘.")
+                        st.session_state.theme_result = res.text # 결과를 세션에 저장
+
+            # --- 추천 결과 출력 및 복사 기능 ---
+            if st.session_state.theme_result:
+                st.divider()
+                st.markdown(st.session_state.theme_result)
+                
+                # '전체복사' 버튼 추가
+                if st.button("📋 추천 내용 전체 복사하기"):
+                    st.copy_to_clipboard(st.session_state.theme_result)
+                    st.toast("클립보드에 복사되었습니다!✨")
 
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
