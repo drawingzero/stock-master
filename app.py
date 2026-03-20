@@ -101,14 +101,14 @@ if st.session_state.api_key:
                         st.session_state.theme_result = res.text # 결과를 세션에 저장
 
             # --- 추천 결과 출력 및 복사 기능 ---
-            if st.session_state.theme_result:
-                st.divider()
-                st.markdown(st.session_state.theme_result)
-                
-                # '전체복사' 버튼 추가
-                if st.button("📋 추천 내용 전체 복사하기"):
-                    st.copy_to_clipboard(st.session_state.theme_result)
-                    st.toast("클립보드에 복사되었습니다!✨")
+if st.session_state.theme_result:
+    st.divider()
+    st.markdown("### ✨ 분석 결과")
+    
+    # 결과 내용을 코드 박스에 넣으면 자동으로 복사 버튼이 생겨!
+    st.code(st.session_state.theme_result, language="markdown")
+    
+    st.info("💡 코드 박스 오른쪽 위의 복사 아이콘을 누르면 전체 복사돼!")
 
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
