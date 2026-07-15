@@ -43,6 +43,36 @@ with st.sidebar:
 # 3. 메인 콘텐츠
 st.title("🎨 Stock Master AI")
 
+# 사이트별 설정 (라벨 / 프롬프트 지시문 / JSON 예시 포맷)
+SITE_INFO = {
+    "shutterstock": {
+        "label": "셔터스톡 (영문 35개)",
+        "instruction": "셔터스톡(영문35개)",
+        "example": '"shutterstock": {"title": "영어 제목", "keywords": "키워드1, 키워드2, ..."}',
+    },
+    "adobe": {
+        "label": "어도비 (영문 30개, 앞10개 중요)",
+        "instruction": "어도비(영문30개, 앞10개중요)",
+        "example": '"adobe": {"title": "영어 제목", "keywords": "키워드1, 키워드2, ..."}',
+    },
+    "tongro": {
+        "label": "통로/유토 (한글 25개)",
+        "instruction": "통로/유토(한글25개)",
+        "example": '"tongro": {"title": "한글 제목", "keywords": "키워드1, 키워드2, ..."}',
+    },
+    "getty": {
+        "label": "게티 (한글 20개)",
+        "instruction": "게티(한글20개)",
+        "example": '"getty": {"title": "한글 제목", "keywords": "키워드1, 키워드2, ..."}',
+    },
+    "miricanvas": {
+        "label": "미리캔버스 (한글 10개)",
+        "instruction": "미리캔버스(한글10개)",
+        "example": '"miricanvas": {"title": "한글 제목", "keywords": "키워드1, 키워드2, ..."}',
+    },
+}
+SITE_KEYS = ["shutterstock", "adobe", "tongro", "getty", "miricanvas"]
+
 # 기본으로 사용할 모델 (목록 조회가 실패해도 이 값으로 동작)
 DEFAULT_MODEL = "gemini-2.5-flash"
 
@@ -68,23 +98,35 @@ if st.session_state.api_key:
 
         with tab1:
             st.subheader("이미지 분석 및 사이트별 키워드 추출")
+
+            st.write("**생성할 사이트 선택**")
+            cols = st.columns(len(SITE_KEYS))
+            selected_sites = []
+            for col, key in zip(cols, SITE_KEYS):
+                with col:
+                    checked = st.checkbox(SITE_INFO[key]["label"], value=True, key="chk_" + key)
+                    if checked:
+                        selected_sites.append(key)
+
             uploaded_files = st.file_uploader("이미지를 업로드하세요", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
-            if uploaded_files and st.button("🚀 분석 시작"):
+            run_clicked = st.button("🚀 분석 시작")
+
+            if run_clicked and not selected_sites:
+                st.warning("사이트를 최소 1개 이상 선택해주세요.")
+
+            if uploaded_files and run_clicked and selected_sites:
                 all_rows = []
 
-                prompt = """스톡 전문가로서 이미지를 분석해 셔터스톡(영문35개), 어도비(영문30개, 앞10개중요), 
-                통로/유토(한글25개), 게티(한글20개), 미리캔버스(한글10개) 검색량이 높은 단어로 구성된 키워드와 제목을 JSON으로 추출하세요.
+                instructions = ", ".join(SITE_INFO[key]["instruction"] for key in selected_sites)
+                examples = ",\n                  ".join(SITE_INFO[key]["example"] for key in selected_sites)
 
-                반드시 아래의 JSON 포맷을 그대로 준수하여 출력해야 하며, 다른 설명이나 마크다운 백틱은 절대 포함하지 마세요.
-
-                {
-                  "shutterstock": {"title": "영어 제목", "keywords": "키워드1, 키워드2, ..."},
-                  "adobe": {"title": "영어 제목", "keywords": "키워드1, 키워드2, ..."},
-                  "tongro": {"title": "한글 제목", "keywords": "키워드1, 키워드2, ..."},
-                  "getty": {"title": "한글 제목", "keywords": "키워드1, 키워드2, ..."},
-                  "miricanvas": {"title": "한글 제목", "keywords": "키워드1, 키워드2, ..."}
-                }"""
+                prompt = (
+                    "스톡 전문가로서 이미지를 분석해 " + instructions +
+                    " 검색량이 높은 단어로 구성된 키워드와 제목을 JSON으로 추출하세요.\n\n"
+                    "반드시 아래의 JSON 포맷을 그대로 준수하여 출력해야 하며, 다른 설명이나 마크다운 백틱은 절대 포함하지 마세요.\n\n"
+                    "{\n                  " + examples + "\n                }"
+                )
 
                 for uploaded_file in uploaded_files:
                     image = Image.open(uploaded_file)
@@ -110,6 +152,8 @@ if st.session_state.api_key:
                             raw_data = json.loads(content_text.strip())
 
                             for site, content in raw_data.items():
+                                if site not in selected_sites:
+                                    continue  # 선택 안 한 사이트는 결과에 안전하게 제외
                                 title = content.get('title', '')
                                 keywords = content.get('keywords', '')
                                 all_rows.append({
