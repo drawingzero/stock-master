@@ -1,5 +1,5 @@
 with tab1:
-            st.subheader("이미지 분석 및 사이트별 키워드 추출")
+      st.subheader("이미지 분석 및 사이트별 키워드 추출")
             uploaded_files = st.file_uploader("이미지를 업로드하세요", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
             if uploaded_files and st.button("🚀 분석 시작"):
