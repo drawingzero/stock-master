@@ -113,10 +113,4 @@ if st.session_state.api_key:
                             with st.expander("AI 원본 응답 보기"):
                                 st.code(response.text)
                         except Exception as e:
-                            st.error(f"'{uploaded_file.name}' 처리 중 오류 발생: {e}")
-
-                if all_rows:
-                    df = pd.DataFrame(all_rows)
-                    st.success("완료!")
-                    st.dataframe(df, use_container_width=True)
-                    st.download_button("📥 CSV 다운로드", df.to_csv(index=False, encoding
+                            st.error(f"'{
