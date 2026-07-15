@@ -81,7 +81,8 @@ if st.session_state.api_key:
                       "miricanvas": {"title": "한글 제목", "keywords": "키워드1, 키워드2, ..."}
                     }"""
 
-                    with st.spinner(f"'{uploaded_file.name}' 처리 중..."):
+                    # f-string 대신 문자열 더하기 사용 (오류 원천 방지)
+                    with st.spinner("'" + uploaded_file.name + "' 처리 중..."):
                         try:
                             # generation_config 추가하여 호출
                             response = model.generate_content(
@@ -108,9 +109,33 @@ if st.session_state.api_key:
                                     "타이틀": title, 
                                     "키워드": keywords
                                 })
-                        except json.JSONDecodeError as je:
-                            st.error(f"'{uploaded_file.name}' 파싱 실패: AI 응답 형식이 올바르지 않습니다.")
+                        except json.JSONDecodeError:
+                            st.error("파싱 실패: '" + uploaded_file.name + "' 이미지의 AI 응답 형식이 올바르지 않습니다.")
                             with st.expander("AI 원본 응답 보기"):
                                 st.code(response.text)
                         except Exception as e:
-                            st.error(f"'{
+                            st.error("오류 발생 (" + uploaded_file.name + "): " + str(e))
+
+                if all_rows:
+                    df = pd.DataFrame(all_rows)
+                    st.success("완료!")
+                    st.dataframe(df, use_container_width=True)
+                    
+                    # 다운로드 버튼 인코딩 부분도 완전히 단일 변수로 분리하여 안전하게 처리
+                    csv_data = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+                    st.download_button(
+                        label="📥 CSV 다운로드",
+                        data=csv_data,
+                        file_name="stock_vertical.csv",
+                        mime="text/csv"
+                    )
+
+        with tab2:
+            st.subheader("📅 데이터 기반 전략 기획")
+            curr_date = datetime.date.today()
+            target_date = curr_date + datetime.timedelta(days=60)
+
+            c1, c2 = st.columns(2)
+            with c1:
+                st.write("### 💎 Blue Ocean")
+                st.caption(f"{curr_date
