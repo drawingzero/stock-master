@@ -81,7 +81,6 @@ if st.session_state.api_key:
                       "miricanvas": {"title": "한글 제목", "keywords": "키워드1, 키워드2, ..."}
                     }"""
 
-                    # f-string 대신 문자열 더하기 사용 (오류 원천 방지)
                     with st.spinner("'" + uploaded_file.name + "' 처리 중..."):
                         try:
                             # generation_config 추가하여 호출
@@ -121,7 +120,7 @@ if st.session_state.api_key:
                     st.success("완료!")
                     st.dataframe(df, use_container_width=True)
                     
-                    # 다운로드 버튼 인코딩 부분도 완전히 단일 변수로 분리하여 안전하게 처리
+                    # 다운로드 버튼 인코딩 안전화
                     csv_data = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
                     st.download_button(
                         label="📥 CSV 다운로드",
@@ -132,10 +131,3 @@ if st.session_state.api_key:
 
         with tab2:
             st.subheader("📅 데이터 기반 전략 기획")
-            curr_date = datetime.date.today()
-            target_date = curr_date + datetime.timedelta(days=60)
-
-            c1, c2 = st.columns(2)
-            with c1:
-                st.write("### 💎 Blue Ocean")
-                st.caption(f"{curr_date
