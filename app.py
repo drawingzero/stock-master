@@ -5,6 +5,8 @@ from PIL import Image
 import pandas as pd
 import json
 import datetime
+import time
+import re
 
 # 1. 사이트 설정 및 디자인
 st.set_page_config(page_title="Stock Master AI", page_icon="🎨", layout="wide")
@@ -76,6 +78,30 @@ SITE_KEYS = ["shutterstock", "adobe", "tongro", "getty", "miricanvas"]
 # 기본으로 사용할 모델 (목록 조회가 실패해도 이 값으로 동작)
 DEFAULT_MODEL = "gemini-2.5-flash"
 
+# 무료 요금제는 분당 요청 수가 제한돼 있어서(429 RESOURCE_EXHAUSTED),
+# 에러가 나면 구글이 알려주는 대기 시간만큼 자동으로 기다렸다가 다시 시도합니다.
+def generate_with_retry(client, spinner_label, max_retries=5, **kwargs):
+    for attempt in range(1, max_retries + 1):
+        try:
+            return client.models.generate_content(**kwargs)
+        except Exception as e:
+            err_text = str(e)
+            is_quota_error = ("RESOURCE_EXHAUSTED" in err_text) or ("429" in err_text)
+            if not is_quota_error or attempt == max_retries:
+                raise  # 할당량 문제가 아니거나, 재시도를 다 써버렸으면 그대로 에러 발생시킴
+
+            # 에러 메시지 안의 'retryDelay': '52s' 같은 값을 찾아서 대기 시간으로 사용
+            match = re.search(r"retryDelay['\"]?\s*[:=]\s*['\"]?(\d+)", err_text)
+            wait_seconds = int(match.group(1)) if match else 20
+            wait_seconds += 2  # 여유 시간 살짝 추가
+
+            with st.spinner(
+                spinner_label + f" — 무료 요금제 사용량 한도에 걸려서 {wait_seconds}초 대기 후 자동 재시도합니다 "
+                f"({attempt}/{max_retries})..."
+            ):
+                time.sleep(wait_seconds)
+    return None  # 이론상 도달하지 않음
+
 if st.session_state.api_key:
     client = genai.Client(api_key=st.session_state.api_key)
 
@@ -128,12 +154,14 @@ if st.session_state.api_key:
                     "{\n                  " + examples + "\n                }"
                 )
 
-                for uploaded_file in uploaded_files:
+                for idx, uploaded_file in enumerate(uploaded_files):
                     image = Image.open(uploaded_file)
 
                     with st.spinner("'" + uploaded_file.name + "' 처리 중..."):
                         try:
-                            response = client.models.generate_content(
+                            response = generate_with_retry(
+                                client,
+                                "'" + uploaded_file.name + "' 처리 중",
                                 model=selected_model_name,
                                 contents=[prompt, image],
                                 config=types.GenerateContentConfig(
@@ -169,6 +197,10 @@ if st.session_state.api_key:
                         except Exception as e:
                             st.error("오류 발생 (" + uploaded_file.name + "): " + str(e))
 
+                    # 무료 요금제 분당 요청 한도(5회/분)를 미리 배려해서, 다음 이미지 전에 살짝 텀을 둡니다.
+                    if idx < len(uploaded_files) - 1:
+                        time.sleep(13)
+
                 if all_rows:
                     df = pd.DataFrame(all_rows)
                     st.success("완료!")
@@ -198,7 +230,9 @@ if st.session_state.api_key:
                             "월 현재 이미지스톡 시장에서 검색량 대비 검색결과 공급이 부족한 "
                             "고수요 저공급 블루오션 일러스트 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘."
                         )
-                        res = client.models.generate_content(
+                        res = generate_with_retry(
+                            client,
+                            "블루오션 분석 중",
                             model=selected_model_name,
                             contents=query_bo,
                         )
@@ -216,7 +250,9 @@ if st.session_state.api_key:
                             "월의 한국과 전세계 공통 기념일/행사를 알려주고, 이를 기반으로 해당 달에 "
                             "검색량이 많을 일러스트 스테디셀러 테마 3개를 추천 이유, 템플릿 예시와 함께 상세히 추천해줘."
                         )
-                        res = client.models.generate_content(
+                        res = generate_with_retry(
+                            client,
+                            "스테디 분석 중",
                             model=selected_model_name,
                             contents=query_st,
                         )
