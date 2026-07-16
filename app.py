@@ -102,6 +102,38 @@ def generate_with_retry(client, spinner_label, max_retries=5, **kwargs):
                 time.sleep(wait_seconds)
     return None  # 이론상 도달하지 않음
 
+
+# 대기 없이 딱 한 번만 시도. 사용량 한도(429)에 걸리면 나중에 재시도하도록 표시만 해두고 넘어갑니다.
+def try_generate_once(client, **kwargs):
+    try:
+        return True, client.models.generate_content(**kwargs), None
+    except Exception as e:
+        err_text = str(e)
+        is_quota_error = ("RESOURCE_EXHAUSTED" in err_text) or ("429" in err_text)
+        return False, None, (err_text, is_quota_error)
+
+
+# AI 응답(JSON 텍스트)을 표에 넣을 행(row) 리스트로 변환
+def parse_rows_from_response(response, file_name, selected_sites):
+    content_text = response.text.strip()
+    if content_text.startswith("```"):
+        content_text = content_text.split("```")[1]
+        if content_text.startswith("json"):
+            content_text = content_text[4:]
+
+    raw_data = json.loads(content_text.strip())
+    rows = []
+    for site, content in raw_data.items():
+        if site not in selected_sites:
+            continue  # 선택 안 한 사이트는 결과에 안전하게 제외
+        rows.append({
+            "파일명": file_name,
+            "사이트": site,
+            "타이틀": content.get('title', ''),
+            "키워드": content.get('keywords', ''),
+        })
+    return rows
+
 if st.session_state.api_key:
     client = genai.Client(api_key=st.session_state.api_key)
 
@@ -143,6 +175,7 @@ if st.session_state.api_key:
 
             if uploaded_files and run_clicked and selected_sites:
                 all_rows = []
+                pending = []  # 사용량 한도(429)로 나중에 재시도할 (파일, 이미지) 목록
 
                 instructions = ", ".join(SITE_INFO[key]["instruction"] for key in selected_sites)
                 examples = ",\n                  ".join(SITE_INFO[key]["example"] for key in selected_sites)
@@ -154,58 +187,68 @@ if st.session_state.api_key:
                     "{\n                  " + examples + "\n                }"
                 )
 
-                for idx, uploaded_file in enumerate(uploaded_files):
+                status_placeholder = st.empty()
+                results_placeholder = st.empty()
+
+                def render_results():
+                    with results_placeholder.container():
+                        if all_rows:
+                            st.dataframe(pd.DataFrame(all_rows), use_container_width=True)
+
+                # 1차: 대기 없이 빠르게 한 번씩만 시도. 성공하는 대로 바로 표에 띄웁니다.
+                status_placeholder.info(f"이미지 {len(uploaded_files)}개 처리 중 (1차 시도)...")
+                for uploaded_file in uploaded_files:
                     image = Image.open(uploaded_file)
-
-                    with st.spinner("'" + uploaded_file.name + "' 처리 중..."):
+                    ok, response, err = try_generate_once(
+                        client,
+                        model=selected_model_name,
+                        contents=[prompt, image],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                        ),
+                    )
+                    if ok:
                         try:
-                            response = generate_with_retry(
-                                client,
-                                "'" + uploaded_file.name + "' 처리 중",
-                                model=selected_model_name,
-                                contents=[prompt, image],
-                                config=types.GenerateContentConfig(
-                                    response_mime_type="application/json",
-                                ),
-                            )
-
-                            content_text = response.text.strip()
-
-                            # 안전장치: 마크다운 기호가 남아있다면 제거
-                            if content_text.startswith("```"):
-                                content_text = content_text.split("```")[1]
-                                if content_text.startswith("json"):
-                                    content_text = content_text[4:]
-
-                            raw_data = json.loads(content_text.strip())
-
-                            for site, content in raw_data.items():
-                                if site not in selected_sites:
-                                    continue  # 선택 안 한 사이트는 결과에 안전하게 제외
-                                title = content.get('title', '')
-                                keywords = content.get('keywords', '')
-                                all_rows.append({
-                                    "파일명": uploaded_file.name,
-                                    "사이트": site,
-                                    "타이틀": title,
-                                    "키워드": keywords
-                                })
+                            all_rows.extend(parse_rows_from_response(response, uploaded_file.name, selected_sites))
+                            render_results()
                         except json.JSONDecodeError:
                             st.error("파싱 실패: '" + uploaded_file.name + "' 이미지의 AI 응답 형식이 올바르지 않습니다.")
-                            with st.expander("AI 원본 응답 보기"):
+                            with st.expander("AI 원본 응답 보기 (" + uploaded_file.name + ")"):
                                 st.code(response.text)
-                        except Exception as e:
-                            st.error("오류 발생 (" + uploaded_file.name + "): " + str(e))
+                    else:
+                        err_text, is_quota_error = err
+                        if is_quota_error:
+                            pending.append((uploaded_file, image))
+                        else:
+                            st.error("오류 발생 (" + uploaded_file.name + "): " + err_text)
 
-                    # 무료 요금제 분당 요청 한도(5회/분)를 미리 배려해서, 다음 이미지 전에 살짝 텀을 둡니다.
-                    if idx < len(uploaded_files) - 1:
-                        time.sleep(13)
+                # 2차: 사용량 한도에 걸렸던 파일들만 대기하면서 재시도
+                if pending:
+                    status_placeholder.warning(
+                        f"{len(pending)}개 파일이 무료 사용량 한도에 걸렸어요. 대기 후 순서대로 재시도할게요..."
+                    )
+                    for uploaded_file, image in pending:
+                        response = generate_with_retry(
+                            client,
+                            "'" + uploaded_file.name + "' 재시도 중",
+                            model=selected_model_name,
+                            contents=[prompt, image],
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json",
+                            ),
+                        )
+                        try:
+                            all_rows.extend(parse_rows_from_response(response, uploaded_file.name, selected_sites))
+                            render_results()
+                        except json.JSONDecodeError:
+                            st.error("파싱 실패: '" + uploaded_file.name + "' 이미지의 AI 응답 형식이 올바르지 않습니다.")
+                            with st.expander("AI 원본 응답 보기 (" + uploaded_file.name + ")"):
+                                st.code(response.text)
+
+                status_placeholder.success("모든 처리가 완료됐어요! ✅")
 
                 if all_rows:
                     df = pd.DataFrame(all_rows)
-                    st.success("완료!")
-                    st.dataframe(df, use_container_width=True)
-
                     csv_data = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
                     st.download_button(
                         label="📥 CSV 다운로드",
